@@ -1,0 +1,76 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture2D<float4> _InputTexture; //Two textures for pingpong
+RWTexture2D<float4> _OutputTexture;
+float2 _PlayerUVPosition; // Range[0, 1] I guess its called pixelspace
+float2 _Resolution; //No clue what this is. Was hopping to create a resolution that I could change
+float _DeltaTime;
+bool _Active;
+float _PressureConstants;
+float _PressureRadius;
+float _WaveCenterWeight;
+float _WaveDivisor;
+float _SpringConstant;
+float _VelocityDamping;
+float _PressureDamping;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	int2 res = int2(_Resolution);
+	if (id.x <= 0 || id.y <= 0 || id.x >= res.x - 1 || id.y >= res.y - 1)
+	{
+		_OutputTexture[id.xy] = _InputTexture.Load(int3(id.xy, 0)); // pass through
+		return;
+	}
+
+	float4 color = _InputTexture.Load(int3(id.xy, 0));
+
+	float pressure = _InputTexture.Load(int3(id.xy, 0)).x;
+	float pVel = _InputTexture.Load(int3(id.xy, 0)).y;
+
+	float p_right = _InputTexture.Load(int3(int2(id.xy) + int2(1, 0), 0)).x;
+	float p_left = _InputTexture.Load(int3(int2(id.xy) + int2(-1, 0), 0)).x;
+	float p_up = _InputTexture.Load(int3(int2(id.xy) + int2(0, 1), 0)).x;
+	float p_down = _InputTexture.Load(int3(int2(id.xy) + int2(0, -1), 0)).x;
+
+	//Change values on border to prevent calculations from breaking
+
+	//Horizontal and vertical wave functions
+	pVel += _DeltaTime * (-_WaveCenterWeight * pressure + p_right + p_left) / _WaveDivisor;
+	pVel += _DeltaTime * (-_WaveCenterWeight * pressure + p_up + p_down) / _WaveDivisor;
+
+	//Change pressure by pressure velocity ? What does this mean
+	pressure += _DeltaTime * pVel;
+
+	//Spring motion to ripples to make them move wave like
+	pVel -= _SpringConstant * _DeltaTime * pressure;
+
+	//Velocity damping to things stop moving
+	pVel *= 1.0 - _VelocityDamping * _DeltaTime;
+
+	//Damping to prevent ripples getting stronger
+	pressure *= _PressureDamping;
+
+	//Player position
+	float2 playerPixel = _PlayerUVPosition * _Resolution;
+
+	if(_Active)
+	{
+		float dist = distance(playerPixel, id.xy);
+		if(dist <= _PressureRadius)
+		{
+			pressure += _PressureConstants - dist / _PressureRadius;
+		}
+	}
+
+	float2 texelSize = 1.0 / _Resolution;
+	float2 gradient = float2((p_right - p_left) / 2.0 * texelSize.x, (p_up - p_down) / 2.0 * texelSize.y);
+
+	// x = pressure, y = pressure velocity, Z,W = X,Y pixelSpace
+	float3 normal = normalize(float3(-gradient.x, 1.0, -gradient.y));
+	_OutputTexture[id.xy] = float4(pressure, pVel, normal.x, normal.z);
+}

@@ -1,0 +1,31 @@
+#pragma kernel SetField
+
+//Noise function from Kenjiro
+#include "Assets/Helper/ClassicNoise3D.hlsl"
+
+//Index = x + y * size.x + z * size.x * size.y
+//float3 is the normalized direction of each point
+RWStructuredBuffer<float3> _VectorField;
+int _SizeX, _SizeY, _SizeZ;
+int _Seed;
+float _Scale;
+float _Speed;
+float _TimeCPU;
+
+[numthreads(16,1,16)]
+void SetField (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _SizeX || id.y >= _SizeY || id.z >= _SizeZ) return;
+
+    int index = id.x + id.y * _SizeX + id.z * _SizeX * _SizeY;
+
+    float3 p = (float3(id.x, id.y, id.z) - float3(_SizeX, _SizeY, _SizeZ) * 0.5f) * _Scale;
+    p += _TimeCPU * _Speed;
+
+    float3 dir;
+    dir.x = ClassicNoise(p + float3(31.1, 0, 0));
+    dir.y = ClassicNoise(p + float3(0, 91.7, 0));
+    dir.z = ClassicNoise(p + float3(0, 0, 53.3));
+
+    _VectorField[index] = normalize(dir);
+}
