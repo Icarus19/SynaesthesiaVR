@@ -5,10 +5,14 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/WaterScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/GrassScene.unity
+    guid: c7e1a362a57c5414dacc64636ad97651
   m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 2af506972186ef24f9b4bf0852645d9c, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 692c202738993ab4197ff516606ae77d, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 1b66463492f721c43a52255b6bbba85a, type: 2}

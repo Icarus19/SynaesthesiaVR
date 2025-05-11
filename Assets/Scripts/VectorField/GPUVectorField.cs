@@ -7,7 +7,7 @@ public class GPUVectorField : MonoBehaviour
     ComputeBuffer vectorFieldBuffer;
 
     [Header("VectorField Settings")]
-    [SerializeField][Tooltip("Dont change this during runtime")]Vector3Int size;
+    [SerializeField][Tooltip("Please use a resolution of 16x1x16")]Vector3Int size;
     [SerializeField][Range(0, 100000)] int seed;
     [SerializeField][Range(0, 1)] float scale;
     [SerializeField] float speed;
@@ -18,10 +18,13 @@ public class GPUVectorField : MonoBehaviour
 
     void Start()
     {
-        int count = size.x * size.y * size.z * 2;
-        vectorFieldBuffer = new ComputeBuffer(count, sizeof(float) * 3);
+        RenderTexture vectorFieldTex = new RenderTexture(2048, 2048, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        vectorFieldTex.enableRandomWrite = true;
+        vectorFieldTex.filterMode = FilterMode.Bilinear;
+        vectorFieldTex.wrapMode = TextureWrapMode.Clamp;
+        vectorFieldTex.Create();
 
-        computeShader.SetBuffer(0, "_VectorField", vectorFieldBuffer);
+        computeShader.SetTexture(0, "_VectorFieldTex", vectorFieldTex);
         computeShader.SetInt("_SizeX", size.x);
         computeShader.SetInt("_SizeY", size.y);
         computeShader.SetInt("_SizeZ", size.z);
@@ -31,7 +34,7 @@ public class GPUVectorField : MonoBehaviour
 
         if (material != null)
         {
-            material.SetBuffer("_VectorField", vectorFieldBuffer);
+            material.SetTexture("_VectorFieldTex", vectorFieldTex);
             material.SetInt("_SizeX", size.x);
             material.SetInt("_SizeY", size.y);
             material.SetInt("_SizeZ", size.z);
@@ -39,7 +42,7 @@ public class GPUVectorField : MonoBehaviour
             
         if (debugMaterial != null)
         {
-            debugMaterial.SetBuffer("_VectorField", vectorFieldBuffer);
+            debugMaterial.SetTexture("_VectorFieldTex", vectorFieldTex);
             debugMaterial.SetInt("_SizeX", size.x );
             debugMaterial.SetInt("_SizeY", size.y );
             debugMaterial.SetInt("_SizeZ", size.z );
@@ -74,6 +77,6 @@ public class GPUVectorField : MonoBehaviour
 
     void OnDisable()
     {
-        vectorFieldBuffer.Dispose();
+        //vectorFieldBuffer.Dispose();
     }
 }

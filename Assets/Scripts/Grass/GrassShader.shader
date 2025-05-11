@@ -15,6 +15,11 @@ Shader "Custom/GrassShader"
         _ShadowStrength("Shadow Strength", float) = 1.0
         _ShadowScale("Shadow Scale", float) = 1.0
         _ShadowSpeed("Shadow Scroll Speed", Vector) = (1, 1, 1, 1)
+        _Scale("Mesh Scale", float) = 1.0
+        _HeightmapTex("Heightmap Texture", 2D) = "white" {}
+        _HeightmapAmplitude("Heightmap Amplitude", float) = 1.0
+        _HeightClumpTex("Height ClumpingTexture", 2D) = "white" {}
+        _BladeHeightMinMax("Minimum and Maximum size of blades", Vector) = (0, 0, 0, 0)
     }
     SubShader
     {
@@ -74,14 +79,32 @@ Shader "Custom/GrassShader"
             float _ShadowStrength;
             float _ShadowScale;
             float2 _ShadowSpeed;
+            float _Scale;
+            float _HeightmapAmplitude;
+            sampler2D _HeightmapTex; //Calling it directly from the properties works but not from cpu, nothing else has changed
+            sampler2D _HeightClumpTex;
+            float2 _BladeHeightMinMax;
 
             //CPU Variables
-            StructuredBuffer<float4> _PositionBuffer;
-            StructuredBuffer<float2> _RotationBuffer;
-            StructuredBuffer<float3> _VectorField;
-            int _SizeX;
-            int _SizeY;
-            int _SizeZ;
+            sampler2D _VectorFieldTex;
+            int _SizeX, _SizeY, _SizeZ;
+            int _InstanceResolution;
+            int _GridSize;
+
+            float3 SampleVectorField(int x, int y, int z)
+            {
+                int index = x + y * _SizeX + z * _SizeX * _SizeY;
+                int texX = index % 2048;
+                int texY = index / 2048;
+
+                float2 uv = (float2(texX, texY) + 0.5) / 2048.0;
+                return tex2Dlod(_VectorFieldTex, float4(uv, 0, 0));
+            }
+
+            float SampleHeightmap(float2 uv)
+            {
+                return tex2Dlod(_HeightmapTex, float4(uv, 0, 0)).r;
+            }
 
             v2f vert (appdata v, uint instanceID : SV_InstanceID)
             {
@@ -90,38 +113,36 @@ Shader "Custom/GrassShader"
                 v2f o;
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-                float4 pos = _PositionBuffer[instanceID];
-                float3 offset = pos.xyz;
-                float scale = pos.w;
-                float2 sincos = _RotationBuffer[instanceID];
+                float3 vertexPosition = v.vertex.xyz * _Scale;
 
-                float3 vertexPosition = v.vertex.xyz * scale;
+                //This almost drove me insane. Why can I not divide two ints and get a float, or atleast give me a warning or something
+                float spacing = (float)_GridSize / (float)_InstanceResolution;
+                float row = instanceID % _InstanceResolution;
+                float column = instanceID / _InstanceResolution;
+                
+                float3 offset = float3(row * spacing, 0, column * spacing);
+                float randomOffsetX = sin(float(instanceID) * 0.1) * 0.2;
+                float randomOffsetZ = cos(float(instanceID) * 0.1) * 0.2;
+                offset.x += randomOffsetX;
+                offset.z += randomOffsetZ;
 
-                //Rotation
-                float rotatedX = vertexPosition.x * sincos.y - vertexPosition.z * sincos.x;
-                float rotatedZ = vertexPosition.x * sincos.x + vertexPosition.z * sincos.y;
+                //Get height from Heightmap
+                float2 heightmapUV = float2(offset.x, offset.z) / _GridSize;
+                float heightFromMap = SampleHeightmap(heightmapUV) * _HeightmapAmplitude;
+                //Randomize height of blades form map //Clamping was to hard to lets just multiply
+                float bladeHeightFromMap = SampleHeightmap(heightmapUV) * _BladeHeightMinMax.x + 1 * _BladeHeightMinMax.y;
+                offset.y = heightFromMap;
+                offset.x -= _GridSize * 0.5;
+                offset.z -= _GridSize * 0.5;
 
-                vertexPosition.x = rotatedX;
-                vertexPosition.z = rotatedZ;
-
+                vertexPosition.y *= bladeHeightFromMap;
                 vertexPosition += offset;
 
                 //Displacement from Vectorfield
                 //No interpolation needed, it looks good anyway
                 //Interpolation might solve the stretching that happens sometimes. But I want this shader to be performant
                 float height = saturate(v.vertex.y);
-                float3 halfFieldSize = float3(_SizeX, _SizeY, _SizeZ) * 2.0 * 0.5;
-                float3 shiftedPos = vertexPosition + halfFieldSize;
-                float3 normalizedPos = clamp(shiftedPos / float3(_SizeX, _SizeY, _SizeZ) / 2.0, 0.0, 1.0);
-
-                //Map to grid
-                int x = (int)(normalizedPos.x * _SizeX - 1);
-                int y = (int)(normalizedPos.y * _SizeY - 1);
-                int z = (int)(normalizedPos.z * _SizeZ - 1);
-
-                int index = x + y * _SizeX + z * _SizeX * _SizeY;
-
-                float3 fieldVector = _VectorField[index];
+                float3 fieldVector = SampleVectorField(vertexPosition.x, vertexPosition.y, vertexPosition.z);
 
                 //Pivot version
                 float3 pivotPos = float3(vertexPosition.x, 0.0, vertexPosition.z);

@@ -14,7 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -23,6 +23,14 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _HeightClumpTex:
+        m_Texture: {fileID: 2800000, guid: d9b21136f5f58ec4b9d08bb22d2da98c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _HeightmapTex:
+        m_Texture: {fileID: 2800000, guid: db0fd1c7b8680994f83d60272606f803, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _ShadowTexture:
         m_Texture: {fileID: 2800000, guid: 116306d199540c940bbd03f4ce9e1b4e, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -33,14 +41,17 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _HeightmapAmplitude: 40
+    - _Scale: 6
     - _ShadowScale: 0.001
     - _ShadowStrength: 0.42
-    - _SwayStrength: 0.98
+    - _SwayStrength: 3.5
     - _TipColorFactor: 0.02
     - _TipColorScale: 3.02
     - _TipColorStrength: 1.27
     m_Colors:
     - _AOColor: {r: 0.9528302, g: 0.95002115, b: 0.9303578, a: 1}
+    - _BladeHeightMinMax: {r: 2.23, g: 0.4, b: 0, a: 0}
     - _Color: {r: 0.109647535, g: 0.41509432, b: 0.08419366, a: 1}
     - _ShadowSpeed: {r: 0.05, g: 0.02, b: 0, a: 0}
     - _TipColor: {r: 0.9000303, g: 0.9528302, b: 0.43596476, a: 1}

@@ -3,17 +3,23 @@ using System.ComponentModel;
 using UnityEditor;
 #endif
 using UnityEngine;
+using UnityEngine.Rendering;
+using System.Collections.Generic;
+using static UnityEngine.Rendering.GPUSort;
 
 public class Grassinstancer : MonoBehaviour
 {
     [SerializeField] Mesh mesh;
     [SerializeField] Material material;
+    Mesh instanceMesh;
 
     public MeshEditor meshEditor;
     
     [Header("Grass Settings")]
-    public int instanceCount;
+    [SerializeField, Range(0, 2048)]public int grassResolution;
     [SerializeField][Range(10, 500)] public float fieldSize;
+    [SerializeField, Range(4, 64)] int tileSize = 32;
+    public int instanceCount;
     [SerializeField] Vector2 grassHeight;
     [SerializeField] Texture2D heightMap;
     [SerializeField] float heightMapScale, heightMapAmplitude;
@@ -21,6 +27,7 @@ public class Grassinstancer : MonoBehaviour
     [SerializeField][Range(0, 5)] int octaves = 3;
     ComputeBuffer positionBuffer, rotationBuffer;
     GraphicsBuffer argsBuffer;
+    List<Vector2Int> _visibleTiles = new();
 
     [Header("HeightmapData")]
     [SerializeField, Tooltip("This will default to the saved map if not chosen")] BakedHeightMapPositions heightMapData;
@@ -33,37 +40,34 @@ public class Grassinstancer : MonoBehaviour
     void Start()
     {
         GetMesh();
-        
-        var positions = GenerateGrassPositions();
-        var rotations = GenerateGrassRotations();
-                
 
-        positionBuffer = new ComputeBuffer(positions.Length, sizeof(float) * 4);
-        rotationBuffer = new ComputeBuffer(positions.Length, sizeof(float) * 2);
+        int grassCount = grassResolution * grassResolution;
 
-        positionBuffer.SetData(positions);
-        rotationBuffer.SetData(rotations);
-        material.SetBuffer("_PositionBuffer", positionBuffer);
-        material.SetBuffer("_RotationBuffer", rotationBuffer);
-
-        uint[] args = new uint[5] { 0, 0, 0, 0, 0 };
+        var args = new uint[5] { 0, 0, 0, 0, 0 };
         args[0] = (mesh != null) ? (uint)mesh.GetIndexCount(0) : 0; // indices per instance
-        args[1] = (uint)instanceCount; // instance count
+        args[1] = (uint)grassCount; // instance count
         args[2] = (mesh != null) ? (uint)mesh.GetIndexStart(0) : 0;
         args[3] = (mesh != null) ? (uint)mesh.GetBaseVertex(0) : 0;
         args[4] = 0;
 
         argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, args.Length * sizeof(uint));
         argsBuffer.SetData(args);
+
+        //You will have to insert the texture directly into the shader because it doesn't work otherwise?!?!
+        material.SetInt("_InstanceResolution", grassResolution);
+        material.SetInt("_GridSize", (int)fieldSize);
     }
+
     void Update()
     {
         Graphics.RenderMeshIndirect(
-            new RenderParams(material) { worldBounds = new Bounds(Vector3.zero, Vector3.one * fieldSize * 2) },
+            new RenderParams(material) { worldBounds = new Bounds(Vector3.zero, fieldSize * 2 * Vector3.one) },
             mesh,
             argsBuffer
         );
     }
+
+    //GeometryUtility.CalculateFrustumSomething(camera);
 
     [ContextMenu("Get Mesh")]
     void GetMesh()
