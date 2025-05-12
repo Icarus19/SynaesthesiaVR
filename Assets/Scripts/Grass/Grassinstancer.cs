@@ -27,6 +27,8 @@ public class Grassinstancer : MonoBehaviour
     [SerializeField][Range(0, 5)] int octaves = 3;
     ComputeBuffer positionBuffer, rotationBuffer;
     GraphicsBuffer argsBuffer;
+    int grassCount;
+    uint[] args;
     List<Vector2Int> _visibleTiles = new();
 
     [Header("HeightmapData")]
@@ -41,9 +43,9 @@ public class Grassinstancer : MonoBehaviour
     {
         GetMesh();
 
-        int grassCount = grassResolution * grassResolution;
+        grassCount = grassResolution * grassResolution;
 
-        var args = new uint[5] { 0, 0, 0, 0, 0 };
+        args = new uint[5] { 0, 0, 0, 0, 0 };
         args[0] = (mesh != null) ? (uint)mesh.GetIndexCount(0) : 0; // indices per instance
         args[1] = (uint)grassCount; // instance count
         args[2] = (mesh != null) ? (uint)mesh.GetIndexStart(0) : 0;
@@ -60,11 +62,20 @@ public class Grassinstancer : MonoBehaviour
 
     void Update()
     {
+        //UpdateArgs(0.25f, 0.5f);
+        
         Graphics.RenderMeshIndirect(
             new RenderParams(material) { worldBounds = new Bounds(Vector3.zero, fieldSize * 2 * Vector3.one) },
             mesh,
             argsBuffer
         );
+    }
+
+    void UpdateArgs(float instance, float index)
+    {
+        args[1] = (uint)(grassCount * instance);
+        args[4] = (uint)(grassCount * index);
+        argsBuffer.SetData(args);
     }
 
     //GeometryUtility.CalculateFrustumSomething(camera);

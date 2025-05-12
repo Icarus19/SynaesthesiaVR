@@ -42,19 +42,19 @@ Material:
     m_Ints: []
     m_Floats:
     - _HeightmapAmplitude: 40
-    - _Scale: 6
+    - _Scale: 3
     - _ShadowScale: 0.001
     - _ShadowStrength: 0.42
-    - _SwayStrength: 3.5
-    - _TipColorFactor: 0.02
-    - _TipColorScale: 3.02
-    - _TipColorStrength: 1.27
+    - _SwayStrength: 14.77
+    - _TipColorFactor: 0.83
+    - _TipColorScale: 0.32
+    - _TipColorStrength: 1.11
     m_Colors:
-    - _AOColor: {r: 0.9528302, g: 0.95002115, b: 0.9303578, a: 1}
-    - _BladeHeightMinMax: {r: 2.23, g: 0.4, b: 0, a: 0}
+    - _AOColor: {r: 0.7311321, g: 1, b: 0.98498803, a: 1}
+    - _BladeHeightMinMax: {r: 2, g: 1.5, b: 0, a: 0}
     - _Color: {r: 0.109647535, g: 0.41509432, b: 0.08419366, a: 1}
-    - _ShadowSpeed: {r: 0.05, g: 0.02, b: 0, a: 0}
-    - _TipColor: {r: 0.9000303, g: 0.9528302, b: 0.43596476, a: 1}
-    - _TipColorOffset: {r: 128, g: 128, b: 0, a: 0}
+    - _ShadowSpeed: {r: 0.02, g: 0.01, b: 0, a: 0}
+    - _TipColor: {r: 0.9528302, g: 0.83238065, b: 0.23820755, a: 1}
+    - _TipColorOffset: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

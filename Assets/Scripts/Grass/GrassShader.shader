@@ -106,14 +106,30 @@ Shader "Custom/GrassShader"
                 return tex2Dlod(_HeightmapTex, float4(uv, 0, 0)).r;
             }
 
+            float Hash(int n)
+            {
+                n = (n << 13) ^ n;
+                return (1.0 - ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
+            }
+
             v2f vert (appdata v, uint instanceID : SV_InstanceID)
             {
                 //VR Compatability
                 UNITY_SETUP_INSTANCE_ID(v);
                 v2f o;
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+                
+                //Rotation from random angles
+                float angle = Hash(instanceID * 13.37) * 6.2831853;
+                float sinA = sin(angle);
+                float cosA = cos(angle);
+                
+                float3 rotatedVertex;
+                rotatedVertex.x = v.vertex.x * cosA - v.vertex.z * sinA;
+                rotatedVertex.y = v.vertex.y;
+                rotatedVertex.z = v.vertex.x * sinA + v.vertex.z * cosA;
 
-                float3 vertexPosition = v.vertex.xyz * _Scale;
+                float3 vertexPosition = rotatedVertex * _Scale;
 
                 //This almost drove me insane. Why can I not divide two ints and get a float, or atleast give me a warning or something
                 float spacing = (float)_GridSize / (float)_InstanceResolution;
@@ -121,8 +137,8 @@ Shader "Custom/GrassShader"
                 float column = instanceID / _InstanceResolution;
                 
                 float3 offset = float3(row * spacing, 0, column * spacing);
-                float randomOffsetX = sin(float(instanceID) * 0.1) * 0.2;
-                float randomOffsetZ = cos(float(instanceID) * 0.1) * 0.2;
+                float randomOffsetX = Hash(instanceID * 3.1) * 2.0 - 1.0;
+                float randomOffsetZ = Hash(instanceID * 7.3) * 2.0 - 1.0;
                 offset.x += randomOffsetX;
                 offset.z += randomOffsetZ;
 
@@ -136,7 +152,6 @@ Shader "Custom/GrassShader"
                 offset.z -= _GridSize * 0.5;
 
                 vertexPosition.y *= bladeHeightFromMap;
-                vertexPosition += offset;
 
                 //Displacement from Vectorfield
                 //No interpolation needed, it looks good anyway
@@ -152,29 +167,29 @@ Shader "Custom/GrassShader"
                     fieldVector.z * height
                 ) * height * _SwayStrength;
 
+                //Offset has to be applied here since the vectorfield expects a normalized input
+                vertexPosition += offset;
                 vertexPosition.xz += bendOffset.xz;
 
                 o.vertex = UnityObjectToClipPos(float4(vertexPosition, 1.0));
                 o.uv = v.uv;
-                o.height = height;
+                o.height = v.vertex.y;
                 o.worldPos = mul(unity_ObjectToWorld, float4(vertexPosition, 1.0)).xyz;
-                UNITY_TRANSFER_FOG(o,o.vertex);
+                UNITY_TRANSFER_FOG(o, o.vertex);
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // sample the texture
-                float4 baseColor = _Color;
-                float4 tipColor = _TipColor;
-
-                float4 ao = lerp(_AOColor, 1.0f, i.uv.y);
+                float4 ao = lerp(0.0, _AOColor, i.height);
+                float4 tipColor = lerp(0.0, _TipColor, i.height * i.height);
 
                 //Vary grass color
-                float2 worldUV = (i.worldPos.xz + _TipColorOffset) * _TipColorScale;
-                float tipTexture = tex2D(_TipColorSpreadTexture, worldUV);
-                float tipStrength = i.height * _TipColorStrength * lerp(1.0, tipTexture, _TipColorFactor);
-                float4 col = lerp(baseColor, tipColor, tipStrength) * ao;
+                float2 colorUV = (i.worldPos.xz + float2(_GridSize, _GridSize)) / (_GridSize * 2);  // map [-128,128]¨[0,1]
+                colorUV = frac(colorUV);    // wrap if tiling (or use saturate(uv) to clamp)
+                float noiseVal = tex2D(_TipColorSpreadTexture, colorUV).r * _TipColorStrength;
+                float remapped = saturate((noiseVal - 0.5) * _TipColorFactor + 0.5);
+                float4 col = lerp(_Color, _TipColor, remapped);
 
                 //Simple Lighting
                 float3 normal = normalize(cross(ddx(i.vertex.xyz), ddy(i.vertex.xyz)));
@@ -185,7 +200,7 @@ Shader "Custom/GrassShader"
                 float rawShadow = tex2D(_ShadowTexture, shadowUV).r;
                 float shadowStrength = lerp(0.5, rawShadow, _ShadowStrength);
 
-                col *= diffuseLight * shadowStrength;
+                col *= diffuseLight * shadowStrength * ao;
                 
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, col);
