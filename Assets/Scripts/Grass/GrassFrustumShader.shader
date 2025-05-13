@@ -1,4 +1,4 @@
-Shader "Custom/GrassShader"
+Shader "Custom/GrassFrustumShader"
 {
     Properties
     {
@@ -9,17 +9,26 @@ Shader "Custom/GrassShader"
         _TipColorScale("Tip Texture Scale", float) = 1.0
         _TipColorOffset("Tip Texture Offset", Vector) = (0, 0, 0, 0)
         _TipColorFactor("Tip Color Factor", float) = 1.0
+        
         _SwayStrength("Sway Strength", float) = 1.0
+        
         _AOColor("Ambient Occlusion Color", Color) = (1, 1, 1, 1)
+        
         _ShadowTexture("Shadow Texture", 2D) = "white" {}
         _ShadowStrength("Shadow Strength", float) = 1.0
         _ShadowScale("Shadow Scale", float) = 1.0
         _ShadowSpeed("Shadow Scroll Speed", Vector) = (1, 1, 1, 1)
+        
         _Scale("Mesh Scale", float) = 1.0
+
         _HeightmapTex("Heightmap Texture", 2D) = "white" {}
         _HeightmapAmplitude("Heightmap Amplitude", float) = 1.0
         _HeightClumpTex("Height ClumpingTexture", 2D) = "white" {}
         _BladeHeightMinMax("Minimum and Maximum size of blades", Vector) = (0, 0, 0, 0)
+
+        _ConeAngleRadians("Cone Angle", float) = 1.0
+        _ConeMaxDistance("Max Distance for Render", float) = 1.0
+        _ConeAspectRatio("Elliptical Spread", float) = 1.0
     }
     SubShader
     {
@@ -85,11 +94,18 @@ Shader "Custom/GrassShader"
             sampler2D _HeightClumpTex;
             float2 _BladeHeightMinMax;
 
+            float _ConeAngleRadians;
+            float _ConeMaxDistance;
+            float _ConeAspectRatio;
+
             //CPU Variables
             sampler2D _VectorFieldTex;
             int _SizeX, _SizeY, _SizeZ;
             int _InstanceResolution;
             int _GridSize;
+            float4 _FrustumPosDir;
+
+            int _StartInstanceID;
 
             float3 SampleVectorField(int x, int y, int z)
             {
@@ -119,8 +135,10 @@ Shader "Custom/GrassShader"
                 v2f o;
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 
+                int globalInstanceID = instanceID + 0.0;
+
                 //Rotation from random angles
-                float angle = Hash(instanceID * 13.37) * 6.2831853;
+                float angle = Hash(globalInstanceID * 13.37) * 6.2831853;
                 float sinA = sin(angle);
                 float cosA = cos(angle);
                 
@@ -133,12 +151,12 @@ Shader "Custom/GrassShader"
 
                 //This almost drove me insane. Why can I not divide two ints and get a float, or atleast give me a warning or something
                 float spacing = (float)_GridSize / (float)_InstanceResolution;
-                float row = instanceID % _InstanceResolution;
-                float column = instanceID / _InstanceResolution;
+                float row = globalInstanceID % _InstanceResolution;
+                float column = globalInstanceID / _InstanceResolution;
                 
                 float3 offset = float3(row * spacing, 0, column * spacing);
-                float randomOffsetX = Hash(instanceID * 3.1) * 2.0 - 1.0;
-                float randomOffsetZ = Hash(instanceID * 7.3) * 2.0 - 1.0;
+                float randomOffsetX = Hash(globalInstanceID * 3.1) * 2.0 - 1.0;
+                float randomOffsetZ = Hash(globalInstanceID * 7.3) * 2.0 - 1.0;
                 offset.x += randomOffsetX;
                 offset.z += randomOffsetZ;
 
@@ -186,7 +204,7 @@ Shader "Custom/GrassShader"
 
                 //Vary grass color
                 float2 colorUV = (i.worldPos.xz + float2(_GridSize, _GridSize)) / (_GridSize * 2);  // map [-128,128]Å®[0,1]
-                colorUV = frac(colorUV);
+                colorUV = frac(colorUV);    // wrap if tiling (or use saturate(uv) to clamp)
                 float noiseVal = tex2D(_TipColorSpreadTexture, colorUV).r * _TipColorStrength;
                 float remapped = saturate((noiseVal - 0.5) * _TipColorFactor + 0.5);
                 float4 col = lerp(_Color, _TipColor, remapped);
