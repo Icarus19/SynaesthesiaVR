@@ -64,12 +64,14 @@ public class Grassinstancer : MonoBehaviour
         argsBuffer.SetData(args);
 
         //You will have to insert the texture directly into the shader because it doesn't work otherwise?!?!
-        material.SetInt("_InstanceResolution", grassResolution);
+        material.SetInt("_InstanceResolution", grassCount);
         material.SetInt("_GridSize", (int)fieldSize);
     }
 
     void Update()
     {
+        material.SetVector("_CameraData", GetCameraData());
+
         Graphics.RenderMeshIndirect(
             new RenderParams(material) { worldBounds = new Bounds(Vector3.zero, fieldSize * 2 * Vector3.one) },
             mesh,
@@ -77,82 +79,17 @@ public class Grassinstancer : MonoBehaviour
         );
     }
 
-    /////////// Culling ///////////////
-    
-    uint GetVisibleChunks()
+    Vector4 GetCameraData()
     {
         if (cam == null)
             cam = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
 
-        const int chunkSize = 51;
+        Vector2 position = new Vector2(cam.transform.position.x, cam.transform.position.z);
+        Vector2 direction = new Vector2(cam.transform.forward.x, cam.transform.forward.z).normalized;
+        //This is off by about 30 radians on the Y axis, but changing it here doesn't do anything so fuck me
 
-        Vector3 camPos = new Vector3(-128, 0, -128);
-        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(cam);
-
-        uint chunks = 0;
-        int chunkIndex = 0;
-
-        int chunksPerAxis = 5;
-        int half = chunksPerAxis / 2;
-
-        int baseX = Mathf.FloorToInt(camPos.x / chunkSize);
-        int baseZ = Mathf.FloorToInt(camPos.z / chunkSize);
-        
-        for(int dz = -half; dz <= half; dz++)
-            for(int dx = -half; dx <= half; dx++)
-            {
-                if (chunkIndex >= 32) break;
-
-                int chunkX = baseX + dx;
-                int chunkZ = baseZ + dz;
-
-                Vector3 center = new Vector3(chunkX * chunkSize + chunkSize / 2f, 0, chunkZ * chunkSize + chunkSize / 2f);
-                Bounds chunkBounds = new Bounds(center, new Vector3(chunkSize, 1000, chunkSize));
-
-                if (GeometryUtility.TestPlanesAABB(frustumPlanes, chunkBounds))
-                {
-                    chunks |= (1u << chunkIndex);
-                }
-
-                chunkIndex++;
-            }
-
-        return chunks;
+        return new Vector4(position.x, position.y, direction.x, direction.y);
     }
-
-    private void OnDrawGizmos()
-    {
-        if (cam == null)
-            cam = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
-
-        const int chunkSize = 51;
-        var visibleColor = Color.green;
-        var invisibleColor = Color.red;
-
-        // Compute chunk visibility
-        uint visibleChunks = GetVisibleChunks();
-
-        Vector3 origin = new Vector3(-128, 0, -128);
-
-        for (int z = 0; z < 5; z++)
-        {
-            for (int x = 0; x < 5; x++)
-            {
-                int index = z * 5 + x;
-                if (index >= 32) break;
-
-                // Set color depending on bit in visibleChunks
-                bool isVisible = (visibleChunks & (1u << index)) != 0;
-                Gizmos.color = isVisible ? visibleColor : invisibleColor;
-
-                Vector3 center = origin + new Vector3(x * chunkSize + chunkSize / 2f, 0, z * chunkSize + chunkSize / 2f);
-                Vector3 size = new Vector3(chunkSize, 0.1f, chunkSize); // Very thin Y for 2D grid on XZ
-
-                Gizmos.DrawWireCube(center, size);
-            }
-        }
-    }
-
 
     /// <summary>
     /// Editor mode generations

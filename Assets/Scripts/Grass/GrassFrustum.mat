@@ -41,7 +41,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _HeightmapAmplitude: 40
+    - _ConeAngleRadians: 1
+    - _ConeAspectRatio: 11.8
+    - _ConeMaxDistance: 100
+    - _HeightmapAmplitude: 20
     - _Scale: 3
     - _ShadowScale: 0.001
     - _ShadowStrength: 0.42

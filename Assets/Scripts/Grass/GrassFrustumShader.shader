@@ -28,7 +28,6 @@ Shader "Custom/GrassFrustumShader"
 
         _ConeAngleRadians("Cone Angle", float) = 1.0
         _ConeMaxDistance("Max Distance for Render", float) = 1.0
-        _ConeAspectRatio("Elliptical Spread", float) = 1.0
     }
     SubShader
     {
@@ -96,16 +95,13 @@ Shader "Custom/GrassFrustumShader"
 
             float _ConeAngleRadians;
             float _ConeMaxDistance;
-            float _ConeAspectRatio;
 
             //CPU Variables
             sampler2D _VectorFieldTex;
             int _SizeX, _SizeY, _SizeZ;
             int _InstanceResolution;
             int _GridSize;
-            float4 _FrustumPosDir;
-
-            int _StartInstanceID;
+            float4 _CameraData;
 
             float3 SampleVectorField(int x, int y, int z)
             {
@@ -135,7 +131,27 @@ Shader "Custom/GrassFrustumShader"
                 v2f o;
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 
-                int globalInstanceID = instanceID + 0.0;
+                //Unpack cameraData and place positions
+                float2 camPos = _CameraData.xy;
+                float2 camDir = _CameraData.zw;
+                float2 right = float2(-camDir.y, camDir.x);
+
+                int globalInstanceID = instanceID;
+
+                // --- Random Sampling in Cone ---
+                float rand1 = Hash(globalInstanceID * 3.17);      // For angle
+                float rand2 = Hash(globalInstanceID * 7.23);      // For radius
+
+                float angleT = rand1;
+                float radiusT = sqrt(rand2);  // sqrt for even distribution in cone area
+
+                float camAngle = -_ConeAngleRadians * 0.5 + angleT * _ConeAngleRadians;
+                float distance = radiusT * _ConeMaxDistance;
+
+                float s = sin(camAngle);
+                float c = cos(camAngle);
+                float2 dir = camDir * c + right * s;
+                float2 pointPosXZ = camPos + dir * distance;
 
                 //Rotation from random angles
                 float angle = Hash(globalInstanceID * 13.37) * 6.2831853;
@@ -146,29 +162,15 @@ Shader "Custom/GrassFrustumShader"
                 rotatedVertex.x = v.vertex.x * cosA - v.vertex.z * sinA;
                 rotatedVertex.y = v.vertex.y;
                 rotatedVertex.z = v.vertex.x * sinA + v.vertex.z * cosA;
-
-                float3 vertexPosition = rotatedVertex * _Scale;
-
-                //This almost drove me insane. Why can I not divide two ints and get a float, or atleast give me a warning or something
-                float spacing = (float)_GridSize / (float)_InstanceResolution;
-                float row = globalInstanceID % _InstanceResolution;
-                float column = globalInstanceID / _InstanceResolution;
                 
-                float3 offset = float3(row * spacing, 0, column * spacing);
-                float randomOffsetX = Hash(globalInstanceID * 3.1) * 2.0 - 1.0;
-                float randomOffsetZ = Hash(globalInstanceID * 7.3) * 2.0 - 1.0;
-                offset.x += randomOffsetX;
-                offset.z += randomOffsetZ;
-
                 //Get height from Heightmap
-                float2 heightmapUV = float2(offset.x, offset.z) / _GridSize;
+                float2 heightmapUV = (pointPosXZ + (_GridSize * 0.5)) / _GridSize;
                 float heightFromMap = SampleHeightmap(heightmapUV) * _HeightmapAmplitude;
                 //Randomize height of blades form map //Clamping was to hard to lets just multiply
                 float bladeHeightFromMap = SampleHeightmap(heightmapUV) * _BladeHeightMinMax.x + 1 * _BladeHeightMinMax.y;
-                offset.y = heightFromMap;
-                offset.x -= _GridSize * 0.5;
-                offset.z -= _GridSize * 0.5;
 
+                float3 vertexPosition = float3(pointPosXZ.x, heightFromMap, pointPosXZ.y) + rotatedVertex * _Scale;
+                
                 vertexPosition.y *= bladeHeightFromMap;
 
                 //Displacement from Vectorfield
@@ -185,9 +187,8 @@ Shader "Custom/GrassFrustumShader"
                     fieldVector.z * height
                 ) * height * _SwayStrength;
 
-                //Offset has to be applied here since the vectorfield expects a normalized input
-                vertexPosition += offset;
                 vertexPosition.xz += bendOffset.xz;
+
 
                 o.vertex = UnityObjectToClipPos(float4(vertexPosition, 1.0));
                 o.uv = v.uv;
